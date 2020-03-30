@@ -1,0 +1,12 @@
+#COMP = g++
+COMP = gcc
+#FLAGS = -Wall -g -std=c++0x
+FLAGS = -Wall -g
+
+all: mini_project3
+
+mini_project: mini_project3.c
+	$(COMP) $(FLAGS) mini_project3.c -lpthread -o $@
+
+clean:
+	rm -f mini_project*.o
