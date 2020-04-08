@@ -214,29 +214,29 @@ int createFile(char name[8], int size){
 
 int deleteFile(char name[8]){
     printf("Deleting file: %s\n",name);
-  // Delete the file with this name
+    // Delete the file with this name
 
-  // Step 1: Look for an inode that is in use with given name
-  // by searching the collection of objects
-  // representing inodes within the super block object.
-  // If it does not exist, then return an error.
-
-    //stores the inode index in the inodes array
-    int iindex;
+    // Step 1: Look for an inode that is in use with given name
+    // by searching the collection of objects
+    // representing inodes within the super block object.
+    // If it does not exist, then return an error.
 
     //Check if file exists, if not print an error message and return
     //otherwise store the index of the inode
+    int iindex = 32;
+
     for(int i = 0; i < INODE_SIZE; i++){
-        if(inodes[i].used == 0){
-            printf("File doesn't exist");
-            return 0;
-        }else if(inodes[i].name == name){
+        if(inodes[i].used == 1 && inodes[i].name == name){
             iindex = i;
         }
     }
+    if(iindex == 32){
+        printf("File doesn't exist");
+        return 0;
+    }
 
-  // Step 2: Free blocks of the file being deleted by updating
-  // the object representing the free block list in the super block object.
+    // Step 2: Free blocks of the file being deleted by updating
+    // the object representing the free block list in the super block object.
 
     //Creates a tempNode and sets all the block pointers to 0
     struct inode tempNode = inodes[iindex];
@@ -246,14 +246,14 @@ int deleteFile(char name[8]){
     //sets inodes array at the index to the tempNode
     inodes[iindex] = tempNode;
 
-  // Step 3: Mark inode as free.
+    // Step 3: Mark inode as free.
     inodes[iindex].used = 0;
-  // Step 4: Write the entire super block back to disk.
+    // Step 4: Write the entire super block back to disk.
 
     writeSuperblock();
 
     return 0;
-} // End Delete
+} 
 
 
 int listDisk(void){
@@ -270,49 +270,64 @@ int listDisk(void){
 
 int readBlock(char name[8], int blockNum, char buf[1024]){
     printf("Reading: %s with blockNum: %d\n",name,blockNum);
-   // read this block from this file
-   // Return an error if and when appropriate. For instance, make sure
-   // blockNum does not exceed size-1.
+    // read this block from this file
+    // Return an error if and when appropriate. For instance, make sure
+    // blockNum does not exceed size-1.
 
-   // Step 1: Locate the inode for this file as in Step 1 of delete.
-    int iindex;
+    //Check if file exists, if not print an error message and return
+    //otherwise store the index of the inode
+    int iindex = 32;
 
     for(int i = 0; i < INODE_SIZE; i++){
-        if(inodes[i].used == 0){
-            printf("File doesn't exist");
-            return 0;
-        }else if(inodes[i].name == name){
+        if(inodes[i].used == 1 && inodes[i].name == name){
             iindex = i;
         }
     }
+    if(iindex == 32){
+        printf("File doesn't exist");
+        return 0;
+    }
 
-   // Step 2: Seek to blockPointers[blockNum] and read the block
-   // from disk to buf.
+    struct inode tempNode = inodes[iindex];
 
+    // Step 2: Seek to blockPointers[blockNum] and read the block
+    // from disk to buf.
+    int offset = 1024 + (1024 * tempNode.blockPointers[blockNum]);
+    //Seek the offset
+    lseek(fd, offset, SEEK_SET)
+    //Read next 1KB to buffer
+    read(fd, buf, 1024);
     return 0;
-} // End read
+}
 
 
 int writeBlock(char name[8], int blockNum, char buf[1024]){
     printf("Writing: %s with blockNum: %d\n",name,blockNum);
-   // write this block to this file
-   // Return an error if and when appropriate.
 
-   // Step 1: Locate the inode for this file as in Step 1 of delete.
-   int iindex;
+    //Check if file exists, if not print an error message and return
+    //otherwise store the index of the inode
+    int iindex = 32;
 
     for(int i = 0; i < INODE_SIZE; i++){
-        if(inodes[i].used == 0){
-            printf("File doesn't exist");
-            return 0;
-        }else if(inodes[i].name == name){
+        if(inodes[i].used == 1 && inodes[i].name == name){
             iindex = i;
         }
     }
+    if(iindex == 32){
+        printf("File doesn't exist");
+        return 0;
+    }
 
-   // Step 2: Seek to blockPointers[blockNum] and write buf to disk.
+    struct inode tempNode = inodes[iindex];
+
+    // Step 2: Seek to blockPointers[blockNum] and write buf to disk.
+    int offset = 1024 + (1024 * tempNode.blockPointers[blockNum]);
+    //Seek the offset
+    lseek(fd, offset, SEEK_SET)
+    //write next 1KB from buffer
+    write(fd, buf, 1024);
     return 0;
-} // end write
+}
 
 int readInput(char inputfile[]){
     printf("opening %s\n",inputfile);
@@ -347,7 +362,7 @@ int readInput(char inputfile[]){
             int size = atoi(sizepointer);
 
             char *buffer = (char *) calloc(1024,sizeof(char));
-
+            buffer[0] = 1;
             switch (*operation)
             {
             case 'C':
