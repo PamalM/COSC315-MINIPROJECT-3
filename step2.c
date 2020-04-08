@@ -8,15 +8,16 @@ int fd;
 
 void myFileSystem(char diskName[8]){
     // Open the file with name diskName
-    fd = open(diskName, O_WRONLY | O_CREAT | O_TRUNC,  S_IRUSR | S_IWUSR);
+
+    //fd = open(diskName, O_WRONLY | O_CREAT | O_TRUNC,  S_IRUSR | S_IWUSR);
 
     // Read the first 1KB and parse it to structs/objecs representing the super block
     // 	An easy way to work with the 1KB memory chunk is to move a pointer to a
     //	position where a struct/object begins. You can use the sizeof operator to help
     //	cleanly determine the position. Next, cast the pointer to a pointer of the
     //	struct/object type.
-    char *buf = (char *) calloc(1024,sizeof(char));
 
+    // char *buf = (char *) calloc(1024,sizeof(char));
 
     // Be sure to close the file in a destructor or otherwise before
     // the process exits.
@@ -101,14 +102,6 @@ int writeBlock(char name[8], int blockNum, char buf[1024]){
 
 } // end write
 
-int main(int argc, char *argv[]){
-    readInput(argv[0]);
-
-    //Close the file
-    close(fd);
-    return 0;
-}
-
 void readInput(char inputfile[]){
     FILE* file = fopen(inputfile,"r");
 
@@ -126,26 +119,26 @@ void readInput(char inputfile[]){
 
         char *operation = strtok(line, delim);
         char *filename = strtok(NULL, delim);
-        int *size = atoi(strtok(NULL, line));
+        int size = atoi(strtok(NULL, line));
 
         char *buffer = (char *) calloc(1024,sizeof(char));
 
         switch (*operation)
         {
         case 'C':
-            createFile(&filename, &size);
+            createFile(filename, size);
             break;
         case 'L':
             listDisk();
             break;
         case 'W':
-            writeBlock(&filename, &size, &buffer);
+            writeBlock(filename, size, buffer);
             break;
         case 'R':
-            readBlock(&filename, &size, &buffer);
+            readBlock(filename, size, buffer);
             break;
         case 'D':
-            deleteFile(&filename);
+            deleteFile(filename);
             break;
         default: //Do nothing
             break;
@@ -155,5 +148,13 @@ void readInput(char inputfile[]){
     }
 
     fclose(file);
+}
+
+int main(int argc, char *argv[]){
+    readInput(argv[0]);
+
+    //Close the file
+    close(fd);
+    return 0;
 }
 
