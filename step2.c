@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#define INODE_SIZE 16
+
 int fd;
 int freeblocklist[128];
 
@@ -14,18 +16,7 @@ struct inode {
    int used;
 } inode;
 
-const INODE_SIZE = 16;
 struct inode inodes[INODE_SIZE];
-
-void trim(const char *input, char *result)
-{
-  int i, j = 0;
-  for (i = 0; input[i] != '\0'; i++) {
-    if (!isspace(input[i])) {
-      result[j++] = input[i];
-    }
-  }
-}
 
 int writeSuperblock() {
     //Set write position to start of file
@@ -41,7 +32,7 @@ int writeSuperblock() {
 
     //Add inodes to buffer
     for(int i = 0; i < INODE_SIZE;i++){
-        buf[127 + (i * 48)] = &inodes[i];
+        buf[127 + (i * 48)] = (int) &inodes[i];
     }
     //write buffer to file
     write(fd,buf, 1024);
@@ -51,9 +42,7 @@ int writeSuperblock() {
 
 int myFileSystem(char diskName[8]){
     // Open the file with name diskName
-    char *trimmed;
-    trim(diskName, trimmed);
-    fd = open(trimmed, O_CREAT, S_IRUSR | S_IWUSR);
+    fd = open(diskName, O_RDWR);
 
     // Read the first 1KB and parse it to structs/objecs representing the super block
     // 	An easy way to work with the 1KB memory chunk is to move a pointer to a
@@ -61,7 +50,9 @@ int myFileSystem(char diskName[8]){
     //	cleanly determine the position. Next, cast the pointer to a pointer of the
     //	struct/object type.
     char *buf = (char *) calloc(1024,sizeof(char));
-    read(fd, buf, 1024);
+    if(read(fd, buf, 1024) < 0){
+        printf("read failed");
+    }
 
     //Current inode
     int inodecounter = 0;
@@ -76,7 +67,7 @@ int myFileSystem(char diskName[8]){
 
     //Loop through all bytes
     for(int i=0;i<896;i++){
-
+        printf("buf: %s", buf[i]);
         //First 128 bytes are the free block list
         if(i < 128){
             freeblocklist[i] = buf[i];
@@ -99,7 +90,7 @@ int myFileSystem(char diskName[8]){
                     //Set inode name
                     strcpy(inodes[inodecounter].name,name);
                     //set inode size
-                    inodes[inodecounter].size = (int) sizebinary;
+                    inodes[inodecounter].size = (unsigned int) sizebinary;
 
                     //Temp variables for inode blockpointers
                     int blockcounter = 0;
@@ -119,7 +110,7 @@ int myFileSystem(char diskName[8]){
                         }
                     }
                     //Set inode used
-                    inodes[inodecounter].used = (int) usedbinary;
+                    inodes[inodecounter].used = (unsigned int) usedbinary;
 
                     //Increase inode counter
                     inodecounter++;
@@ -133,6 +124,8 @@ int myFileSystem(char diskName[8]){
 
     // Be sure to close the file in a destructor or otherwise before
     // the process exits.
+
+
     return 0;
 }
 
@@ -151,13 +144,14 @@ int createFile(char name[8], int size){
                 printf("error: inode with same name found.");
                 return 0;
         }
+        printf("USED: %d\n",inodes[i].used);
         //If inode is not used, if all are used freeinode will stay 32
         if(inodes[i].used == 0) {
             freeinode = i;
         }
     }
     if(freeinode == 32) {
-        printf("error: no free inodes");
+        printf("error: no free inodes\n");
         return 0;
     }
 
@@ -170,7 +164,7 @@ int createFile(char name[8], int size){
         freeblocks += (freeblocklist[i] == '0');
     }
     if(freeblocks < size) {
-        printf("error: not enough free blocks");
+        printf("error: not enough free blocks\n");
         return 0;
     }
 
@@ -231,7 +225,7 @@ int deleteFile(char name[8]){
         }
     }
     if(iindex == 32){
-        printf("File doesn't exist");
+        printf("File doesn't exist\n");
         return 0;
     }
 
@@ -253,7 +247,7 @@ int deleteFile(char name[8]){
     writeSuperblock();
 
     return 0;
-} 
+}
 
 
 int listDisk(void){
@@ -294,7 +288,7 @@ int readBlock(char name[8], int blockNum, char buf[1024]){
     // from disk to buf.
     int offset = 1024 + (1024 * tempNode.blockPointers[blockNum]);
     //Seek the offset
-    lseek(fd, offset, SEEK_SET)
+    lseek(fd, offset, SEEK_SET);
     //Read next 1KB to buffer
     read(fd, buf, 1024);
     return 0;
@@ -323,17 +317,16 @@ int writeBlock(char name[8], int blockNum, char buf[1024]){
     // Step 2: Seek to blockPointers[blockNum] and write buf to disk.
     int offset = 1024 + (1024 * tempNode.blockPointers[blockNum]);
     //Seek the offset
-    lseek(fd, offset, SEEK_SET)
+    lseek(fd, offset, SEEK_SET);
     //write next 1KB from buffer
     write(fd, buf, 1024);
     return 0;
 }
 
 int readInput(char inputfile[]){
-    printf("opening %s\n",inputfile);
     FILE* file = fopen(inputfile,"r");
 
-    char line[1024];
+    char line[256];
     char delim[] = " ";
 
     int i = 0;
@@ -362,7 +355,7 @@ int readInput(char inputfile[]){
             int size = atoi(sizepointer);
 
             char *buffer = (char *) calloc(1024,sizeof(char));
-            buffer[0] = 1;
+            //buffer[0] = 1;
             switch (*operation)
             {
             case 'C':
@@ -387,6 +380,16 @@ int readInput(char inputfile[]){
 }
 
 int main(int argc, char *argv[]){
+
+    for(int i = 0;i<INODE_SIZE; i++){
+        strcpy(inodes[i].name, "noname");
+        inodes[i].size = 0;
+        for(int j = 0; j < 8; j++){
+            inodes[i].blockPointers[j] = 0;
+        }
+        inodes[i].used = 0;
+    }
+
     readInput(argv[1]);
 
     //Close the file
